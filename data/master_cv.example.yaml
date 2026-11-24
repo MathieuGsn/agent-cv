@@ -1,0 +1,139 @@
+# ==============================================================================
+# MASTER CV — EXEMPLE FICTIF
+# Profil entièrement inventé (nom, coordonnées, écoles, entreprises, chiffres)
+# pour que le projet soit compréhensible et testable sans données personnelles.
+#
+# Pour utiliser l'agent avec ton propre profil : copie ce fichier en
+# data/master_cv.yaml (ignoré par git) et remplace tout par tes vraies infos.
+# Règle n°1 : ne jamais mettre dans le master quelque chose que tu n'as pas fait.
+# ==============================================================================
+
+personal:
+  name: "Camille Exemple"
+  location: "Lyon (69)"
+  email: "camille.exemple@example.com"
+  phone: "01 23 45 67 89"
+  linkedin_url: "linkedin.com/in/camille-exemple"
+  linkedin_display: "linkedin.com/in/camille-exemple"
+  github_url: null
+
+headline:
+  fr: >-
+    Étudiant·e ingénieur·e en 5e année (majeure Data Engineering, diplôme 2027),
+    je recherche un stage de fin d'études de 6 mois à partir de mars 2027 en Data.
+  en: >-
+    Final-year engineering student (Data Engineering major, graduating 2027),
+    seeking a 6-month end-of-studies internship in Data starting March 2027.
+
+education:
+  - institution: "École d'Ingénieurs Fictive"
+    degree:
+      fr: "Cycle ingénieur, majeure Data Engineering (5e année)"
+      en: "Engineering degree, Data Engineering major (5th year)"
+    dates: "09/2022 - 07/2027"
+    details:
+      fr:
+        - "Cours principaux : Big Data (Spark), Cloud Computing, Bases de données NoSQL, Machine Learning"
+      en:
+        - "Main courses: Big Data (Spark), Cloud Computing, NoSQL Databases, Machine Learning"
+    tags: [formation, data-engineering]
+
+  - institution: "Université Imaginaire (Canada)"
+    degree:
+      fr: "Semestre d'études à l'international"
+      en: "International exchange semester"
+    dates: "01/2025 - 05/2025"
+    details:
+      fr: []
+      en: []
+    tags: [international, echange-universitaire]
+
+experiences:
+  - id: stage_exemple
+    title:
+      fr: "Stagiaire Data Engineer"
+      en: "Data Engineering Intern"
+    company: "DataCorp (entreprise fictive)"
+    location: "Lyon (69)"
+    dates: "02/2026 - 07/2026"
+    context:
+      fr: >-
+        Mise en place de pipelines de données pour l'équipe Business Intelligence.
+      en: >-
+        Built data pipelines for the Business Intelligence team.
+    bullets:
+      - fr: "Conception de pipelines ETL en Python et SQL alimentant un entrepôt de données PostgreSQL."
+        en: "Designed Python and SQL ETL pipelines feeding a PostgreSQL data warehouse."
+        tags: [python, sql, etl, postgresql, pipelines-donnees]
+      - fr: "Orchestration des traitements quotidiens avec Apache Airflow et supervision des échecs."
+        en: "Orchestrated daily jobs with Apache Airflow and monitored failures."
+        tags: [airflow, orchestration]
+      - fr: "Création de tableaux de bord Power BI pour le suivi des indicateurs commerciaux."
+        en: "Built Power BI dashboards to track sales KPIs."
+        tags: [power-bi, dataviz]
+      - fr: "Conteneurisation des scripts avec Docker et déploiement sur un environnement de recette."
+        en: "Containerized scripts with Docker and deployed them to a staging environment."
+        tags: [docker, deploiement]
+    tags: [python, sql, etl, airflow, power-bi]
+
+complementary_experiences:
+  - title:
+      fr: "Équipier en restauration rapide"
+      en: "Fast-food crew member"
+    company: "Burger Imaginaire"
+    location: "Lyon (69)"
+    dates: { fr: "Étés 2023 et 2024", en: "Summers 2023 and 2024" }
+    tags: [jobs-etudiants, relation-client, travail-en-equipe]
+
+projects:
+  - id: projet_meteo
+    title:
+      fr: "Pipeline de données météo"
+      en: "Weather data pipeline"
+    dates: { fr: "En cours", en: "Ongoing" }
+    bullets:
+      - fr: "Ingestion quotidienne de données d'une API météo publique en Python, stockage en Parquet."
+        en: "Daily ingestion of public weather API data in Python, stored as Parquet."
+        tags: [python, api, pipeline-ingestion]
+      - fr: "Modèle de prévision de température avec scikit-learn et suivi des erreurs."
+        en: "Temperature forecasting model with scikit-learn and error tracking."
+        tags: [machine-learning, scikit-learn]
+    tags: [python, data-engineering, projet-personnel]
+
+skills:
+  - category:
+      fr: "Langages de programmation"
+      en: "Programming Languages"
+    items: ["Python", "SQL", "Java"]
+  - category:
+      fr: "Data & Intelligence Artificielle"
+      en: "Data & Artificial Intelligence"
+    items: ["pandas", "scikit-learn", "Pipelines ETL", "Apache Airflow", "Power BI"]
+  - category:
+      fr: "Cloud & DevOps"
+      en: "Cloud & DevOps"
+    items: ["Docker", "Git / GitHub", "Linux"]
+  - category:
+      fr: "Bases de données"
+      en: "Databases"
+    items: ["PostgreSQL", "MongoDB"]
+
+soft_skills:
+  fr:
+    - "Rigueur, autonomie"
+    - "Communication, travail en équipe"
+  en:
+    - "Rigor, autonomy"
+    - "Communication, teamwork"
+
+languages:
+  - name: { fr: "Français", en: "French" }
+    level: { fr: "Langue maternelle", en: "Native speaker" }
+  - name: { fr: "Anglais", en: "English" }
+    level: { fr: "Courant (C1)", en: "Fluent (C1)" }
+
+interests:
+  - { fr: "Randonnée", en: "Hiking" }
+  - { fr: "Échecs", en: "Chess" }
+
+certifications: []

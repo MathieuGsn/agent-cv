@@ -1,0 +1,33 @@
+# ---------------------------------------------------------------------------
+# Données personnelles : JAMAIS dans le repo (projet public)
+# ---------------------------------------------------------------------------
+data/candidatures.db
+data/candidatures.db-*
+data/*.db
+data/master_cv.yaml
+data/notes_rapport_stage.md
+offres/
+sources/
+output/
+mails/
+
+# Identifiants, tokens, secrets
+.env
+.env.*
+*.env
+secrets/
+token*.json
+*token*.json
+*credentials*.json
+client_secret*.json
+*.pem
+*.key
+.claude/settings.local.json
+
+# Fichiers système / Python
+__pycache__/
+*.pyc
+desktop.ini
+Thumbs.db
+.DS_Store
+.streamlit/secrets.toml

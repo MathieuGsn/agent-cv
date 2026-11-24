@@ -1,0 +1,180 @@
+\documentclass[10.5pt,a4paper]{article}
+
+% ---------------------------------------------------------------------------
+% CV ATS -- une colonne, pas de photo, pas de tableaux de mise en page.
+% Genere depuis data/master_cv.yaml (ou offres/.../cv_adapte.yaml) par
+% scripts/build.py (rendu Jinja2 avec delimiteurs compatibles LaTeX).
+% ---------------------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,left=1.6cm,right=1.6cm,top=0.75cm,bottom=0.75cm]{geometry}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage[hidelinks,pdfusetitle]{hyperref}
+
+% Texte extractible proprement par les ATS (accents + ligatures).
+\input{glyphtounicode}
+\pdfgentounicode=1
+
+% Metadonnees PDF.
+\hypersetup{
+  pdftitle={\VAR{meta.pdftitle|tex}},
+  pdfauthor={\VAR{meta.pdfauthor|tex}},
+  pdfkeywords={\VAR{meta.pdfkeywords|tex}},
+  pdfcreator={},
+  pdfproducer={}
+}
+
+\definecolor{rulegray}{gray}{0.55}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+% Titres de section : gras, filet fin EN DESSOUS (pas a travers), avec un
+% vrai espace avant le contenu qui suit.
+\newcommand{\cvsectionrule}{\titlerule[0.6pt]}
+\titleformat{\section}
+  {\large\bfseries}
+  {}
+  {0pt}
+  {}
+  [\vspace{2pt}\cvsectionrule]
+\titlespacing*{\section}{0pt}{7pt}{4pt}
+
+% partopsep=0pt est essentiel : sans ca, enumitem ajoute un espace
+% supplementaire quand la liste suit un saut de ligne force (\\), ce qui
+% cree des "lignes vides" parasites entre un titre d'entree et ses puces.
+\newlist{cvitems}{itemize}{2}
+\setlist[cvitems]{leftmargin=1.1em, itemsep=0.5pt, parsep=0pt, topsep=1.5pt, partopsep=0pt, label=--}
+
+\newcommand{\entryheader}[2]{%
+  \noindent{\bfseries #1} \hfill {\itshape #2}\\
+}
+
+\begin{document}
+% Pas de cesure : un mot coupe en fin de ligne nuit a l'extraction ATS.
+\raggedright
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+
+% ---------------------------------------------------------------------- %
+% En-tete : nom + coordonnees en texte brut (pas de header/footer LaTeX). %
+% ---------------------------------------------------------------------- %
+\begin{center}
+  {\Huge\bfseries \VAR{personal.name|tex}}\\[4pt]
+  \VAR{personal.location|tex} ~|~ \VAR{personal.phone|tex} ~|~ \VAR{personal.email|tex} ~|~ \href{https://\VAR{personal.linkedin_url|tex}}{\VAR{personal.linkedin_display|tex}}\BLOCK{ if personal.github_url } ~|~ \href{https://\VAR{personal.github_url|tex}}{\VAR{personal.github_display|tex}}\BLOCK{ endif }
+\end{center}
+
+\vspace{3pt}
+\noindent \VAR{headline|tex}
+
+% ---------------------------------------------------------------------- %
+% Formation / Education                                                   %
+% ---------------------------------------------------------------------- %
+\section*{\VAR{labels.education|tex}}
+\BLOCK{ for edu in education }
+\entryheader{\VAR{edu.institution|tex} | \VAR{edu.degree|tex}}{\VAR{edu.dates|tex}}
+\BLOCK{ if edu.details }
+\begin{cvitems}
+\BLOCK{ for d in edu.details }
+  \item \VAR{d|tex}
+\BLOCK{ endfor }
+\end{cvitems}
+\BLOCK{ else }
+\vspace{2pt}
+\BLOCK{ endif }
+\BLOCK{ endfor }
+
+% ---------------------------------------------------------------------- %
+% Experience professionnelle / Experience                                 %
+% ---------------------------------------------------------------------- %
+\section*{\VAR{labels.experience|tex}}
+\BLOCK{ for exp in experiences }
+\entryheader{\VAR{exp.title|tex} | \VAR{exp.company|tex}, \VAR{exp.location|tex}}{\VAR{exp.dates|tex}}
+\BLOCK{ if exp.context }
+\textit{\VAR{exp.context|tex}}\\[1pt]
+\BLOCK{ endif }
+\begin{cvitems}
+\BLOCK{ for b in exp.bullets }
+  \item \VAR{b|tex}
+\BLOCK{ endfor }
+\end{cvitems}
+\vspace{1.5pt}
+\BLOCK{ endfor }
+
+% ---------------------------------------------------------------------- %
+% Projets / Projects                                                      %
+% ---------------------------------------------------------------------- %
+\BLOCK{ if projects }
+\section*{\VAR{labels.projects|tex}}
+\BLOCK{ for proj in projects }
+\BLOCK{ if proj.dates }
+\entryheader{\VAR{proj.title|tex}}{\VAR{proj.dates|tex}}
+\BLOCK{ else }
+\noindent{\bfseries \VAR{proj.title|tex}}\\
+\BLOCK{ endif }
+\begin{cvitems}
+\BLOCK{ for b in proj.bullets }
+  \item \VAR{b|tex}
+\BLOCK{ endfor }
+\end{cvitems}
+\vspace{1pt}
+\BLOCK{ endfor }
+\BLOCK{ endif }
+
+% ---------------------------------------------------------------------- %
+% Experiences complementaires / Additional Experience (lignes courtes)    %
+% ---------------------------------------------------------------------- %
+\BLOCK{ if complementary_experiences }
+\section*{\VAR{labels.complementary_experiences|tex}}
+\BLOCK{ for cexp in complementary_experiences }
+\entryheader{\VAR{cexp.title|tex} | \VAR{cexp.company|tex}}{\VAR{cexp.dates|tex}}
+\BLOCK{ endfor }
+\BLOCK{ endif }
+
+% ---------------------------------------------------------------------- %
+% Competences / Skills                                                    %
+% ---------------------------------------------------------------------- %
+\section*{\VAR{labels.skills|tex}}
+\begin{cvitems}
+\BLOCK{ for cat in skills }
+  \item \textbf{\VAR{cat.category|tex} :} \VAR{cat.text|tex}
+\BLOCK{ endfor }
+\end{cvitems}
+
+% ---------------------------------------------------------------------- %
+% Langues / Languages                                                     %
+% ---------------------------------------------------------------------- %
+\section*{\VAR{labels.languages|tex}}
+\begin{cvitems}
+\BLOCK{ for lg in languages }
+  \item \textbf{\VAR{lg.name|tex} :} \VAR{lg.level|tex}
+\BLOCK{ endfor }
+\end{cvitems}
+
+\BLOCK{ if interests }
+% ---------------------------------------------------------------------- %
+% Centres d'interet / Interests                                           %
+% ---------------------------------------------------------------------- %
+\section*{\VAR{labels.interests|tex}}
+\noindent \VAR{interests|tex}
+\BLOCK{ endif }
+
+\BLOCK{ if certifications }
+% ---------------------------------------------------------------------- %
+% Certifications                                                          %
+% ---------------------------------------------------------------------- %
+\section*{\VAR{labels.certifications|tex}}
+\begin{cvitems}
+\BLOCK{ for c in certifications }
+  \item \VAR{c|tex}
+\BLOCK{ endfor }
+\end{cvitems}
+\BLOCK{ endif }
+
+\end{document}
