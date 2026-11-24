@@ -79,6 +79,10 @@ def extract_text(cv_path: pathlib.Path) -> str:
     return cv_path.read_text(encoding="utf-8", errors="replace")
 
 
+# Longueur (sans espaces) en dessous de laquelle un mot-clé doit apparaître comme mot entier.
+MOT_COURT_MAX = 4
+
+
 def score_cv(keywords: list, cv_text: str) -> dict:
     spaced_text = normalize_spaced(cv_text)
     squashed_text = normalize_squashed(cv_text)
@@ -88,9 +92,14 @@ def score_cv(keywords: list, cv_text: str) -> dict:
     for kw in keywords:
         norm_spaced_kw = normalize_spaced(kw)
         norm_squashed_kw = normalize_squashed(kw)
-        hit = f" {norm_spaced_kw} " in padded_spaced or (
-            norm_squashed_kw and norm_squashed_kw in squashed_text
-        )
+        whole_word = f" {norm_spaced_kw} " in padded_spaced
+        if len(norm_squashed_kw) <= MOT_COURT_MAX:
+            # Mots-clés courts (ETL, SQL, AWS, C, R, Java...) : mot entier uniquement,
+            # sinon "etl" serait trouvé dans "settlement" ou "java" dans "javascript".
+            hit = whole_word
+        else:
+            # Mots-clés longs : on tolère les variantes d'espacement ("Power BI" / "PowerBI").
+            hit = whole_word or (norm_squashed_kw and norm_squashed_kw in squashed_text)
         (matched if hit else missing).append(kw)
 
     total = len(keywords)
