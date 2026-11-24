@@ -18,9 +18,12 @@ sys.path.insert(0, str(ROOT / "dashboard"))
 
 import candidatures as C  # noqa: E402
 import claude_runner as R  # noqa: E402
+import pages_suivi as P  # noqa: E402
+import ui  # noqa: E402
 from _tools import find_tool  # noqa: E402
 
-st.set_page_config(page_title="Candidatures", page_icon="📄", layout="wide")
+st.set_page_config(page_title="Agent CV", page_icon="📄", layout="wide")
+ui.charger_style()
 
 
 def conn():
@@ -63,39 +66,81 @@ def candidature_du_dossier(dossier: pathlib.Path) -> dict | None:
     return None
 
 
+def prenom() -> str:
+    nom = (P.personal().get("name") or "").split()
+    return nom[0] if nom else ""
+
+
+# Traitement en cours : gardé dans la session ET dans l'URL (?job=...), pour le
+# retrouver après un rafraîchissement de la page ou un redémarrage du dashboard.
+def job_courant() -> pathlib.Path | None:
+    if st.session_state.get("job"):
+        return pathlib.Path(st.session_state["job"])
+    j = R.job_par_nom(st.query_params.get("job", ""))
+    if j:
+        st.session_state["job"] = str(j)
+    return j
+
+
+def definir_job(job: pathlib.Path | None) -> None:
+    if job:
+        st.session_state["job"] = str(job)
+        st.query_params["job"] = job.name
+    else:
+        st.session_state.pop("job", None)
+        st.query_params.pop("job", None)
+
+
 # =========================================================================== page 1
 
 def page_nouvelle():
-    st.title("Nouvelle candidature")
-    st.caption(
-        "Colle l'offre, clique sur **Adapter mon CV** : l'agent lance le même workflow que "
-        "`/adapter-cv` (zéro invention, une page, vérification ATS) et ajoute la candidature au suivi."
-    )
-
-    job = st.session_state.get("job")
+    job = job_courant()
     if job:
-        afficher_traitement(pathlib.Path(job))
+        afficher_traitement(job)
         return
+
+    p = prenom()
+    ui.hero(
+        f"Bonjour {p} 👋" if p else "Nouvelle candidature",
+        "Colle une offre, je m'occupe du CV",
+        "Même workflow que /adapter-cv : zéro invention, une page, vérification ATS. "
+        "Compte 1 à 3 minutes.",
+    )
 
     if not R.find_claude():
         st.error(R.CONSEILS_ERREUR["claude_introuvable"])
 
-    with st.form("offre"):
-        texte = st.text_area(
-            "Texte complet de l'offre",
-            height=320,
-            placeholder="Colle ici tout le texte de l'offre (missions, profil, compétences, lieu…)",
-        )
-        c1, c2 = st.columns(2)
-        lien = c1.text_input("Lien de l'offre (optionnel)")
-        source = c2.selectbox(
-            "Source (optionnel)", [""] + C.SOURCES,
-            format_func=lambda s: s or "Détecter automatiquement",
-        )
-        c3, c4 = st.columns(2)
-        entreprise = c3.text_input("Entreprise (optionnel, détectée sinon)")
-        poste = c4.text_input("Poste (optionnel, détecté sinon)")
-        go = st.form_submit_button("Adapter mon CV", type="primary", width="stretch")
+    with st.container(key="carte_offre"):
+        with st.form("offre", border=False):
+            texte = st.text_area(
+                "Texte de l'offre",
+                height=320,
+                label_visibility="collapsed",
+                placeholder=(
+                    "Colle ici le texte complet de l'offre…\n\n"
+                    "Missions, profil recherché, compétences, lieu, date de début : "
+                    "plus le texte est complet, mieux le CV sera adapté."
+                ),
+            )
+            with st.expander("Infos optionnelles — lien, entreprise, poste, source"):
+                c1, c2 = st.columns(2)
+                lien = c1.text_input("Lien de l'offre", placeholder="https://…")
+                source = c2.selectbox(
+                    "Source", [""] + C.SOURCES,
+                    format_func=lambda s: s or "Détecter automatiquement",
+                )
+                c3, c4 = st.columns(2)
+                entreprise = c3.text_input("Entreprise", placeholder="Détectée depuis le texte")
+                poste = c4.text_input("Poste", placeholder="Détecté depuis le texte")
+            go = st.form_submit_button("✨  Adapter mon CV", type="primary", width="stretch")
+
+    st.html(
+        '<div class="ac-how">'
+        '<div><span class="n">1</span><span><b>Colle l\'offre</b>Le texte complet, copié depuis le site.</span></div>'
+        '<div><span class="n">2</span><span><b>L\'agent adapte</b>Sélection, reformulation fidèle, compilation, vérif ATS.</span></div>'
+        '<div><span class="n">3</span><span><b>Tu postules</b>Télécharge le PDF, puis « J\'ai postulé » : relance à J+10.</span></div>'
+        "</div>"
+    )
 
     if go:
         if len(texte.strip()) < 200:
@@ -106,7 +151,7 @@ def page_nouvelle():
         except FileNotFoundError:
             st.error(R.CONSEILS_ERREUR["claude_introuvable"])
             return
-        st.session_state["job"] = str(job)
+        definir_job(job)
         st.rerun()
 
 
@@ -114,25 +159,30 @@ def afficher_traitement(job: pathlib.Path):
     @st.fragment(run_every=2)
     def suivi():
         e = R.etat(job)
-        if e["statut"] == "en_cours":
-            fait = e["etape"]
-            st.progress(fait / len(e["etapes"]),
-                        text=f"⏳ {e['etapes'][max(fait - 1, 0)] if fait else 'Démarrage de Claude Code'}… "
-                             f"({e['duree'] // 60} min {e['duree'] % 60:02d} s — compte 1 à 3 minutes)")
-            cols = st.columns(len(e["etapes"]))
-            for i, (col, nom) in enumerate(zip(cols, e["etapes"]), start=1):
-                col.caption(("✅ " if i <= fait else "◻️ ") + nom)
-            with st.expander("Log en direct", expanded=True):
-                st.code("\n".join(e["log"][-25:]) or "Démarrage…", language=None)
-            if st.button("Arrêter le traitement"):
-                R.arreter(job)
-                st.rerun()
-        else:
+        if e["statut"] != "en_cours":
             st.rerun(scope="app")
+        etape = max(e["etape"], 1)
+        with st.container(key="carte_suivi"):
+            st.html(
+                '<div class="ac-job-head"><h3>Adaptation en cours…</h3>'
+                f'<span class="ac-chrono">⏱ {e["duree"] // 60} min {e["duree"] % 60:02d} s · compte 1 à 3 min</span></div>'
+                + ui.stepper(e["etapes"], etape, "en cours…")
+            )
+        with st.expander("Log technique"):
+            st.code("\n".join(e["log"][-30:]) or "Démarrage de Claude Code…", language=None)
 
     e = R.etat(job)
     if e["statut"] == "en_cours":
-        suivi()
+        ui.hero("Nouvelle candidature", "Je prépare ton CV", "Tu peux changer d'onglet : le traitement continue.")
+        gauche, droite = st.columns([2, 1], gap="large")
+        with gauche:
+            suivi()
+        with droite:
+            st.html('<p class="ac-muted">L\'agent suit exactement le workflow /adapter-cv. '
+                    "Rien n'est inventé : les compétences absentes de ton master CV sont listées à part.</p>")
+            if st.button("Arrêter le traitement", width="stretch"):
+                R.arreter(job)
+                st.rerun()
     elif e["statut"] == "question":
         afficher_question(job, e)
     elif e["statut"] == "termine":
@@ -142,11 +192,12 @@ def afficher_traitement(job: pathlib.Path):
 
 
 def afficher_question(job: pathlib.Path, e: dict):
-    st.info("**L'agent a besoin d'une précision avant de finir le CV :**")
-    st.markdown(f"> {e['question']}")
-    with st.form("reponse"):
-        rep = st.text_area("Ta réponse", height=100)
-        ok = st.form_submit_button("Envoyer la réponse et continuer", type="primary")
+    with st.container(key="carte_question"):
+        st.html(f'<div class="ac-callout"><b>💬 L\'agent a besoin d\'une précision avant de finir le CV</b>'
+                f"{ui.e(e['question'])}</div>")
+        with st.form("reponse", border=False):
+            rep = st.text_area("Ta réponse", height=110)
+            ok = st.form_submit_button("Envoyer la réponse et continuer", type="primary", width="stretch")
     if ok and rep.strip():
         R.repondre(job, rep.strip())
         st.rerun()
@@ -154,12 +205,13 @@ def afficher_question(job: pathlib.Path, e: dict):
 
 
 def afficher_erreur(e: dict):
-    st.error(f"**Le traitement n'a pas abouti.** {e.get('message', '')}")
-    st.markdown("**Quoi faire :** " + R.CONSEILS_ERREUR.get(e.get("type_erreur"), R.CONSEILS_ERREUR["autre"]))
-    with st.expander("Détails techniques"):
-        st.code("\n".join(e["log"][-40:]) or "(pas de log)", language=None)
-        if e.get("stderr"):
-            st.code(e["stderr"][-3000:], language=None)
+    with st.container(key="carte_erreur"):
+        st.html(f'<div class="ac-callout err"><b>Le traitement n\'a pas abouti</b>{ui.e(e.get("message", ""))}</div>')
+        st.markdown("**Quoi faire :** " + R.CONSEILS_ERREUR.get(e.get("type_erreur"), R.CONSEILS_ERREUR["autre"]))
+        with st.expander("Détails techniques"):
+            st.code("\n".join(e["log"][-40:]) or "(pas de log)", language=None)
+            if e.get("stderr"):
+                st.code(e["stderr"][-3000:], language=None)
     bouton_nouvelle()
 
 
@@ -168,72 +220,85 @@ def afficher_resultat(e: dict):
     res = lire_json(dossier / "resultat.json")
     score = lire_json(dossier / "score.json")
     cand = candidature_du_dossier(dossier)
+    entreprise = res.get("entreprise") or (cand or {}).get("entreprise", "?")
+    poste = res.get("poste") or (cand or {}).get("poste", "")
 
-    titre = f"{res.get('entreprise') or (cand or {}).get('entreprise', '?')} — {res.get('poste') or (cand or {}).get('poste', '')}"
-    st.success(f"CV adapté : **{titre}**")
-
-    gauche, droite = st.columns([3, 2], gap="large")
     pdf = pathlib.Path(ROOT / res["chemin_cv_pdf"]) if res.get("chemin_cv_pdf") else None
     if not pdf or not pdf.exists():
         pdfs = sorted(dossier.glob("*.pdf"))
         pdf = pdfs[0] if pdfs else None
 
+    # ---- en-tête
+    infos = [x for x in (res.get("ville"), res.get("source") or (cand or {}).get("source"), res.get("type_contrat")) if x]
+    statut = (cand or {}).get("statut")
+    with st.container(key="carte_entete"):
+        st.html(
+            '<div class="ac-result-head"><div class="ico">✓</div><div>'
+            f"<h2>CV prêt pour {ui.e(entreprise)}</h2><p>{ui.e(poste)}</p>"
+            '<div class="ac-badges">'
+            + "".join(ui.badge(i, "info") for i in infos)
+            + (ui.badge_statut(statut) if statut else "")
+            + "</div></div></div>"
+        )
+
+    # ---- aperçu | score + détails
+    gauche, droite = st.columns([5, 6], gap="medium")
     with gauche:
-        if pdf:
-            png = apercu_pdf(pdf)
+        with st.container(key="carte_apercu"):
+            ui.titre_section("Aperçu du CV")
+            png = apercu_pdf(pdf) if pdf else None
             if png:
-                st.image(str(png), width="stretch")
-            else:
+                st.image(png.read_bytes(), width="stretch")
+            elif pdf:
                 st.caption("Aperçu indisponible (pdftoppm introuvable) : télécharge le PDF.")
-        else:
-            st.warning("PDF introuvable dans le dossier de l'offre.")
+            else:
+                st.warning("PDF introuvable dans le dossier de l'offre.")
 
     with droite:
-        if pdf:
-            st.download_button("⬇ Télécharger le PDF", pdf.read_bytes(), file_name=pdf.name,
-                               mime="application/pdf", type="primary", width="stretch")
         av, ap = score.get("score_avant"), score.get("score_apres")
         if av is not None and ap is not None:
-            c1, c2 = st.columns(2)
-            c1.metric("Score de correspondance avant", f"{av:.0f} %")
-            c2.metric("Après adaptation", f"{ap:.0f} %", delta=f"{ap - av:+.0f} pts")
-            st.caption("Part des mots-clés de l'offre présents dans le CV (keyword_score.py).")
-
+            with st.container(key="carte_score"):
+                ui.score(av, ap)
         if res.get("modifications"):
-            st.subheader("Modifications")
-            st.markdown("\n".join(f"- {m}" for m in res["modifications"]))
-        if res.get("competences_manquantes"):
-            st.subheader("Compétences demandées que tu n'as pas")
-            st.markdown("\n".join(f"- {m}" for m in res["competences_manquantes"]))
-            st.caption("Jamais ajoutées au CV. À toi de voir si tu veux les travailler.")
-        if res.get("a_confirmer"):
-            st.subheader("À confirmer")
-            st.markdown("\n".join(f"- {m}" for m in res["a_confirmer"]))
-            st.caption("Tu les as peut-être, mais elles ne sont pas dans ton master CV : "
-                       "ajoute-les à data/master_cv.yaml si c'est vrai, puis régénère.")
+            with st.container(key="carte_modifs"):
+                ui.titre_section("Ce qui a été adapté")
+                ui.liste(res["modifications"])
+        if res.get("competences_manquantes") or res.get("a_confirmer"):
+            with st.container(key="carte_competences"):
+                if res.get("competences_manquantes"):
+                    ui.titre_section("Demandé par l'offre, absent de ton profil")
+                    ui.badges(res["competences_manquantes"], "negatif")
+                    st.caption("Jamais ajoutées au CV.")
+                if res.get("a_confirmer"):
+                    ui.titre_section("À confirmer")
+                    ui.badges(res["a_confirmer"], "entretien")
+                    st.caption("Tu les as peut-être : ajoute-les à data/master_cv.yaml si c'est vrai, puis régénère.")
 
-        st.divider()
-        if cand:
-            if cand["statut"] == "À postuler":
-                b1, b2 = st.columns(2)
-                if b1.button("✅ J'ai postulé", type="primary", width="stretch"):
-                    c = C.changer_statut(conn(), cand["id"], "Postulé")
-                    st.session_state["flash"] = (
-                        f"{c['entreprise']} passé en Postulé — relance prévue le "
-                        f"{C.parse_date(c['date_relance_prevue']).strftime('%d/%m/%Y')}."
-                    )
-                    st.session_state.pop("job", None)
-                    st.rerun()
-                if b2.button("Pas maintenant", width="stretch"):
-                    st.session_state["flash"] = f"{cand['entreprise']} reste en « À postuler »."
-                    st.session_state.pop("job", None)
-                    st.rerun()
-            else:
-                st.caption(f"Statut actuel dans le suivi : **{cand['statut']}**")
-                bouton_nouvelle()
+    # ---- actions
+    with st.container(key="carte_actions"):
+        a1, a2, a3 = st.columns(3)
+        if pdf:
+            a1.download_button("⬇  Télécharger le PDF", pdf.read_bytes(), file_name=pdf.name,
+                               mime="application/pdf", width="stretch")
+        if cand and cand["statut"] == "À postuler":
+            if a2.button("✅  J'ai postulé", type="primary", width="stretch"):
+                c = C.changer_statut(conn(), cand["id"], "Postulé")
+                st.session_state["flash"] = (
+                    f"{c['entreprise']} passé en Postulé — relance prévue le "
+                    f"{C.parse_date(c['date_relance_prevue']).strftime('%d/%m/%Y')}."
+                )
+                definir_job(None)
+                st.rerun()
+            if a3.button("Pas maintenant", width="stretch"):
+                st.session_state["flash"] = f"{cand['entreprise']} reste en « À postuler »."
+                definir_job(None)
+                st.rerun()
         else:
-            st.warning("La candidature n'a pas été trouvée dans le suivi.")
-            bouton_nouvelle()
+            if not cand:
+                a2.warning("Candidature introuvable dans le suivi.")
+            if a3.button("Nouvelle offre", type="primary", width="stretch"):
+                definir_job(None)
+                st.rerun()
 
     with st.expander("Récap complet de l'agent"):
         st.markdown(e.get("texte", ""))
@@ -243,30 +308,47 @@ def afficher_resultat(e: dict):
 
 def bouton_nouvelle(secondaire: bool = False):
     if st.button("Nouvelle offre", type="secondary" if secondaire else "primary"):
-        st.session_state.pop("job", None)
+        definir_job(None)
         st.rerun()
 
 
-# =========================================================================== pages suivantes (étape 4, suite)
+# =========================================================================== sidebar + navigation
 
-def page_a_venir(nom):
-    def _p():
-        st.title(nom)
-        st.info("Cette page arrive dans la suite de l'étape 4.")
-    _p.__name__ = "page_" + "".join(ch for ch in nom.lower() if ch.isalnum())
-    return _p
+def sidebar_resume():
+    try:
+        c = conn()
+        nb_rel = len(C.relances_dues(c))
+        nb_ent = len(C.entretiens_a_venir(c))
+        nb_todo = len(C.a_postuler(c))
+    except Exception:  # la sidebar ne doit jamais casser la page
+        return
+    lignes = [
+        ("🔔 Relances à faire", nb_rel, nb_rel > 0),
+        ("📅 Entretiens à venir", nb_ent, False),
+        ("📝 À postuler", nb_todo, False),
+    ]
+    st.sidebar.html(
+        '<div class="ac-side-sum">'
+        + "".join(f'<div class="{"alerte" if alerte else ""}"><span>{lbl}</span><b>{n}</b></div>'
+                  for lbl, n, alerte in lignes)
+        + "</div>"
+    )
 
 
-# =========================================================================== navigation
+st.logo(str(ROOT / "dashboard" / "assets" / "logo.svg"), size="large")
 
 if "flash" in st.session_state:
     st.toast(st.session_state.pop("flash"), icon="✅")
 
+p_nouvelle = st.Page(page_nouvelle, title="Nouvelle candidature", icon="✨", default=True)
+st.session_state["page_nouvelle"] = p_nouvelle
 pages = [
-    st.Page(page_nouvelle, title="Nouvelle candidature", icon="✏️", default=True),
-    st.Page(page_a_venir("Vue d'ensemble"), title="Vue d'ensemble", icon="📊"),
-    st.Page(page_a_venir("Mes candidatures"), title="Mes candidatures", icon="📋"),
-    st.Page(page_a_venir("À faire"), title="À faire", icon="🔔"),
-    st.Page(page_a_venir("Statistiques"), title="Statistiques", icon="📈"),
+    p_nouvelle,
+    st.Page(P.page_vue_ensemble, url_path="vue-ensemble", title="Vue d'ensemble", icon="📊"),
+    st.Page(P.page_candidatures, url_path="candidatures", title="Mes candidatures", icon="📋"),
+    st.Page(P.page_a_faire, url_path="a-faire", title="À faire", icon="🔔"),
+    st.Page(P.page_stats, url_path="statistiques", title="Statistiques", icon="📈"),
 ]
-st.navigation(pages, position="top").run()
+nav = st.navigation(pages, position="sidebar")
+sidebar_resume()
+nav.run()

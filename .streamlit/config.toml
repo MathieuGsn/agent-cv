@@ -1,10 +1,22 @@
 [browser]
 gatherUsageStats = false
 
+[client]
+toolbarMode = "minimal"
+
 [server]
 headless = true
 runOnSave = false
 
 [theme]
-primaryColor = "#2563eb"
-font = "sans serif"
+base = "light"
+backgroundColor = "#f5f6fa"
+secondaryBackgroundColor = "#eef0f5"
+textColor = "#111827"
+primaryColor = "#4f46e5"
+font = "Inter, 'Segoe UI', sans-serif"
+headingFont = "Inter, 'Segoe UI', sans-serif"
+headingFontWeights = [700, 700, 600]
+baseRadius = "10px"
+showSidebarBorder = false
+

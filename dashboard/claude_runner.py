@@ -138,6 +138,45 @@ def _demarrer(job: pathlib.Path, cmd: list[str]) -> None:
         env=env, creationflags=flags,
     )
     _PROCS[str(job)] = proc
+    meta = _meta(job)
+    meta["pid"] = proc.pid
+    _ecrire_meta(job, meta)
+
+
+def _pid_vivant(pid: int | None) -> bool:
+    if not pid:
+        return False
+    if os.name == "nt":
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        h = k32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ok = k32.GetExitCodeProcess(h, ctypes.byref(code))
+        k32.CloseHandle(h)
+        return bool(ok) and code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except OSError:
+        return False
+
+
+def _en_cours(job: pathlib.Path, meta: dict) -> bool:
+    proc = _PROCS.get(str(job))
+    if proc is not None:
+        return proc.poll() is None
+    # Dashboard relancé pendant un traitement : on se fie au pid enregistré.
+    return _pid_vivant(meta.get("pid"))
+
+
+def job_par_nom(nom: str) -> pathlib.Path | None:
+    """Retrouve un traitement depuis son nom (paramètre ?job= de l'URL)."""
+    if not nom or "/" in nom or "\\" in nom or ".." in nom:
+        return None
+    j = JOBS_DIR / nom
+    return j if (j / "meta.json").exists() else None
 
 
 def _meta(job: pathlib.Path) -> dict:
@@ -191,9 +230,11 @@ def repondre(job: pathlib.Path, reponse: str) -> None:
 
 def arreter(job: pathlib.Path) -> None:
     proc = _PROCS.get(str(job))
+    meta = _meta(job)
     if proc and proc.poll() is None:
         proc.kill()
-    meta = _meta(job)
+    elif _pid_vivant(meta.get("pid")):
+        subprocess.run(["taskkill", "/PID", str(meta["pid"]), "/T", "/F"], capture_output=True)
     meta["arrete"] = True
     _ecrire_meta(job, meta)
 
@@ -291,7 +332,7 @@ def etat(job: pathlib.Path) -> dict:
                 resultat = ev  # le dernier "result" (après une reprise) gagne
 
     proc = _PROCS.get(str(job))
-    en_cours = proc is not None and proc.poll() is None
+    en_cours = _en_cours(job, meta)
     stderr = (job / "stderr.txt").read_text(encoding="utf-8", errors="replace") if (job / "stderr.txt").exists() else ""
     debut = meta.get("debut_reprise") or meta.get("debut") or time.time()
 
@@ -300,7 +341,7 @@ def etat(job: pathlib.Path) -> dict:
 
     if en_cours:
         if time.time() - debut > TIMEOUT_S:
-            proc.kill()
+            arreter(job)
             return {**base, "statut": "erreur", "type_erreur": "timeout",
                     "message": f"Le traitement a dépassé {TIMEOUT_S // 60} minutes et a été arrêté."}
         return {**base, "statut": "en_cours"}
@@ -312,7 +353,7 @@ def etat(job: pathlib.Path) -> dict:
     texte = (resultat or {}).get("result") or ""
 
     if not resultat:
-        if proc is None and not events.exists():
+        if not events.exists():
             return {**base, "statut": "erreur", "type_erreur": "perdu",
                     "message": "Ce traitement n'est plus suivi (le dashboard a été redémarré)."}
         return {**base, "statut": "erreur", "type_erreur": _type_erreur(stderr, ""),
