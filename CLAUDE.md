@@ -120,6 +120,27 @@ ouverte après une installation winget.
 - Captures d'écran publiques (README) : uniquement avec le profil fictif,
   `AGENT_CV_MASTER=data/master_cv.example.yaml`, jamais avec le vrai CV.
 - Tests : `python -m unittest discover -s tests`.
+- Variables utiles pour tester sans toucher aux vraies données :
+  `AGENT_CV_DB` (autre base), `AGENT_CV_MAILS` (autre dossier de mails),
+  `AGENT_CV_MASTER` (autre profil, ex. le profil fictif).
+
+## Analyse des mails (option C, sans connexion)
+
+- L'accès Microsoft Graph à la boîte EFREI est **bloqué** (approbation de
+  l'administrateur requise pour `Mail.Read`). Ne pas chercher à contourner :
+  pas de connexion à la boîte mail.
+- Onglet *Analyser un mail* : Mathieu colle un mail ou dépose un `.eml` /
+  `.msg`, ou les range dans `mails/` (ignoré par git). Analyse locale dans
+  `scripts/mail_analyse.py` : association à une candidature (nom, domaine de
+  l'expéditeur, plateformes de recrutement), type de réponse (accusé de
+  réception, refus, entretien, test technique, offre, autre), statut proposé
+  sans jamais faire reculer la candidature, date d'entretien si citée.
+- C'est une **proposition** : rien n'est modifié avant le clic sur
+  « Appliquer ». Aucun mail n'est jamais supprimé, déplacé ni envoyé. Les
+  mails traités sont mémorisés (table `mails_traites`) pour ne pas être
+  reproposés.
+- Bouton facultatif « Demander à Claude » pour un mail ambigu : envoie le
+  texte du mail à Claude **sans aucun outil**, réponse JSON = proposition.
 
 ## Points de validation avec Mathieu
 

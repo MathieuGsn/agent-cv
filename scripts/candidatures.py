@@ -30,6 +30,7 @@ import argparse
 import csv
 import datetime as dt
 import json
+import os
 import pathlib
 import sqlite3
 import sys
@@ -39,7 +40,8 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "data" / "candidatures.db"
+# AGENT_CV_DB : autre base (tests, captures d'écran), sinon data/candidatures.db.
+DB_PATH = pathlib.Path(os.environ["AGENT_CV_DB"]) if os.environ.get("AGENT_CV_DB") else ROOT / "data" / "candidatures.db"
 
 # Parcours principal, dans l'ordre.
 STATUTS_PARCOURS = [

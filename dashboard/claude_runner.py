@@ -417,3 +417,46 @@ CONSEILS_ERREUR = {
     "arrete": "Tu peux relancer le traitement quand tu veux.",
     "autre": "Regarde le log ci-dessous. Si le problème persiste, lance `/adapter-cv` depuis VS Code.",
 }
+
+
+# --------------------------------------------------------------------------- analyse d'un mail (facultatif)
+
+def analyser_mail_claude(mail: dict, cands: list[dict], statuts: list[str], timeout: int = 180) -> dict:
+    """Demande à Claude une proposition pour un mail ambigu. Aucun outil autorisé :
+    Claude lit seulement le texte fourni et répond par un JSON. Rien n'est modifié."""
+    claude = find_claude()
+    if not claude:
+        raise FileNotFoundError("claude")
+    lignes = "\n".join(f"{c['id']} | {c['entreprise']} | {c['poste']} | {c['statut']}" for c in cands)
+    prompt = (
+        "Tu analyses un mail reçu par Mathieu au sujet d'une candidature de stage. "
+        "Réponds UNIQUEMENT par un objet JSON, sans aucun texte autour :\n"
+        '{"candidature_id": <id ou null>, "type": "accuse|refus|entretien|test|offre|autre", '
+        '"statut": "<un des statuts ci-dessous ou null>", "date_entretien": "AAAA-MM-JJ ou null", '
+        '"explication": "<une phrase courte en français>"}\n\n'
+        f"Statuts possibles : {', '.join(statuts)}.\n"
+        "Ne propose jamais de faire reculer une candidature dans le parcours ; un accusé de réception "
+        "ne change pas le statut (sauf « À postuler » -> « Postulé »). Si tu n'es pas sûr de la "
+        "candidature, mets null.\n\n"
+        f"Candidatures (id | entreprise | poste | statut actuel) :\n{lignes}\n\n"
+        f"Mail :\nDe : {mail.get('expediteur_nom', '')} <{mail.get('expediteur_email', '')}>\n"
+        f"Objet : {mail.get('objet', '')}\nDate : {mail.get('date') or ''}\n\n"
+        f"{(mail.get('corps') or '')[:6000]}"
+    )
+    tous_les_outils = ["Bash", "Edit", "Write", "Read", "Glob", "Grep", "WebFetch", "WebSearch",
+                       "Agent", "Task", "NotebookEdit", "AskUserQuestion", "PowerShell"]
+    r = subprocess.run(
+        [claude, "-p", prompt, "--output-format", "json", "--disallowedTools", *tous_les_outils],
+        cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout,
+        env=dict(os.environ, PYTHONIOENCODING="utf-8"),
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    sortie = r.stdout.decode("utf-8", "replace")
+    try:
+        texte = json.loads(sortie).get("result", "")
+    except json.JSONDecodeError:
+        texte = sortie
+    m = re.search(r"\{.*\}", texte, re.S)
+    if not m:
+        raise RuntimeError(f"Réponse inattendue de Claude : {texte[:300] or r.stderr.decode('utf-8', 'replace')[:300]}")
+    return json.loads(m.group(0))

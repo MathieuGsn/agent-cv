@@ -92,6 +92,7 @@ le dashboard.
 | Vue d'ensemble | Chiffres clés, candidatures par semaine, répartition par statut |
 | Mes candidatures | Tableau filtrable, détail, historique, mise à jour, export CSV |
 | À faire | Relances (mail proposé, jamais envoyé), entretiens, CV à envoyer |
+| Analyser un mail | Coller un mail ou déposer un `.eml` / `.msg` → candidature retrouvée, type de réponse (refus, entretien, test…), mise à jour proposée à valider |
 | Statistiques | Taux de réponse par source, score moyen avec / sans réponse |
 
 ### Commandes Claude Code
@@ -125,6 +126,7 @@ scripts/build.py              yaml -> tex -> pdf
 scripts/ats_check.py          vérifie la lisibilité ATS d'un PDF
 scripts/keyword_score.py      score de correspondance mots-clés offre <-> CV
 scripts/candidatures.py       suivi des candidatures (SQLite) : module + CLI
+scripts/mail_analyse.py       analyse locale d'un mail de recruteur (texte, .eml, .msg)
 dashboard/                    dashboard Streamlit (app, onglets, style, lancement headless)
 .claude/commands/             commandes Claude Code (/adapter-cv, /postule, ...)
 tests/                        tests unitaires

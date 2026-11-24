@@ -19,6 +19,8 @@ sys.path.insert(0, str(ROOT / "dashboard"))
 import candidatures as C  # noqa: E402
 import claude_runner as R  # noqa: E402
 import pages_suivi as P  # noqa: E402
+import pages_mails  # noqa: E402
+import mail_analyse  # noqa: E402
 import ui  # noqa: E402
 from _tools import find_tool  # noqa: E402
 
@@ -320,6 +322,7 @@ def sidebar_resume():
         nb_rel = len(C.relances_dues(c))
         nb_ent = len(C.entretiens_a_venir(c))
         nb_todo = len(C.a_postuler(c))
+        nb_mails = len(mail_analyse.nouveaux_fichiers(c))
     except Exception:  # la sidebar ne doit jamais casser la page
         return
     lignes = [
@@ -327,6 +330,8 @@ def sidebar_resume():
         ("📅 Entretiens à venir", nb_ent, False),
         ("📝 À postuler", nb_todo, False),
     ]
+    if nb_mails:
+        lignes.append(("📨 Mails à analyser", nb_mails, True))
     st.sidebar.html(
         '<div class="ac-side-sum">'
         + "".join(f'<div class="{"alerte" if alerte else ""}"><span>{lbl}</span><b>{n}</b></div>'
@@ -347,6 +352,7 @@ pages = [
     st.Page(P.page_vue_ensemble, url_path="vue-ensemble", title="Vue d'ensemble", icon="📊"),
     st.Page(P.page_candidatures, url_path="candidatures", title="Mes candidatures", icon="📋"),
     st.Page(P.page_a_faire, url_path="a-faire", title="À faire", icon="🔔"),
+    st.Page(pages_mails.page_mails, url_path="mails", title="Analyser un mail", icon="📨"),
     st.Page(P.page_stats, url_path="statistiques", title="Statistiques", icon="📈"),
 ]
 nav = st.navigation(pages, position="sidebar")
