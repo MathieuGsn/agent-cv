@@ -13,10 +13,13 @@ Usage CLI (sortie JSON quand --json est passé) :
     python scripts/candidatures.py upsert --json-file chemin.json
     python scripts/candidatures.py enregistrer offres/<dossier>   # fin de /adapter-cv
     python scripts/candidatures.py add --entreprise X --poste Y [--source ...] [...]
+    python scripts/candidatures.py set <id> --date-entretien AAAA-MM-JJ [--contact-nom ...]
     python scripts/candidatures.py postule <id>
     python scripts/candidatures.py statut <id> "<statut>" [--note "..."]
     python scripts/candidatures.py relances [--json]
     python scripts/candidatures.py bilan [--json]
+    python scripts/candidatures.py a-faire          # relances, entretiens, à postuler (JSON)
+    python scripts/candidatures.py show <id>        # détail + historique (JSON)
     python scripts/candidatures.py auto            # applique la règle des 30 jours
     python scripts/candidatures.py import-csv offres/suivi.csv
     python scripts/candidatures.py demo-seed | demo-purge
@@ -585,12 +588,17 @@ def main(argv=None):
     for champ in CHAMPS:
         if champ not in ("est_demo", "date_derniere_maj", "date_statut"):
             s.add_argument(f"--{champ.replace('_', '-')}", dest=champ)
+    s = sub.add_parser("set"); s.add_argument("id", type=int)
+    for champ in CHAMPS:
+        if champ not in ("est_demo", "date_derniere_maj", "date_statut", "statut", "notes"):
+            s.add_argument(f"--{champ.replace('_', '-')}", dest=champ)
     s = sub.add_parser("postule"); s.add_argument("id", type=int); s.add_argument("--date")
     s = sub.add_parser("statut"); s.add_argument("id", type=int); s.add_argument("statut")
     s.add_argument("--note"); s.add_argument("--date")
     s = sub.add_parser("note"); s.add_argument("id", type=int); s.add_argument("note")
     s = sub.add_parser("relances"); s.add_argument("--json", action="store_true")
     s = sub.add_parser("bilan"); s.add_argument("--json", action="store_true")
+    sub.add_parser("a-faire")
     sub.add_parser("auto")
     s = sub.add_parser("import-csv"); s.add_argument("chemin")
     sub.add_parser("demo-seed")
@@ -631,6 +639,10 @@ def main(argv=None):
         champs = {k: v for k, v in vars(a).items() if k in CHAMPS and v}
         cid = ajouter(conn, **champs)
         print(f"Ajoutée : {_fmt(get(conn, cid))}")
+    elif a.cmd == "set":
+        champs = {k: v for k, v in vars(a).items() if k in CHAMPS and v is not None}
+        modifier(conn, a.id, **champs)
+        print(f"Mis à jour : {_fmt(get(conn, a.id))} ({', '.join(champs) or 'rien'})")
     elif a.cmd == "postule":
         c = changer_statut(conn, a.id, "Postulé", date=a.date)
         print(f"{_fmt(c)} — relance prévue le {parse_date(c['date_relance_prevue']).strftime('%d/%m/%Y')}")
@@ -648,6 +660,12 @@ def main(argv=None):
     elif a.cmd == "bilan":
         b = bilan(conn)
         _sortie(b, a.json, json.dumps(b, ensure_ascii=False, indent=2))
+    elif a.cmd == "a-faire":
+        _sortie({
+            "relances": relances_dues(conn),
+            "entretiens_a_venir": entretiens_a_venir(conn),
+            "a_postuler": a_postuler(conn),
+        }, True, "")
     elif a.cmd == "auto":
         print("Règles automatiques appliquées.")
     elif a.cmd == "import-csv":
