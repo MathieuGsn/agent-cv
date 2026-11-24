@@ -84,6 +84,42 @@ ouverte après une installation winget.
   mots-clés avant/après (`scripts/keyword_score.py`).
 - Une fois une offre donnée en phase 2, produire le PDF sans poser de
   questions, sauf si une information manque vraiment.
+- Fin de `/adapter-cv` : écrire `resultat.json` puis
+  `python scripts/candidatures.py enregistrer offres/<dossier>` (ajout ou
+  mise à jour sans doublon dans le suivi, statut `À postuler`).
+
+## Suivi des candidatures
+
+- Base SQLite locale `data/candidatures.db` (données perso, ignorée par git).
+  Toute lecture/écriture passe par `scripts/candidatures.py` (module + CLI) :
+  ne jamais écrire dans la base à la main.
+- Statuts : `À postuler` → `Postulé` → `Relancé` → `Entretien RH` →
+  `Test technique` → `Entretien technique` → `Offre reçue` → `Acceptée`, et à
+  tout moment `Refusé`, `Sans réponse`, `Abandonné`. Chaque changement va
+  dans la table `historique`.
+- Règles automatiques (dans `candidatures.py`) : `Postulé` → relance prévue à
+  J+10 ; une seule relance (`Relancé` supprime la relance prévue) ;
+  `Postulé`/`Relancé` depuis plus de 30 jours → `Sans réponse`.
+- Le « score de correspondance » = score mots-clés de `keyword_score.py`
+  (ne pas l'appeler « score ATS » : `ats_check.py` vérifie la lisibilité).
+- Commandes : `/postule <entreprise>`, `/statut <entreprise> <statut> [note]`,
+  `/ajout-candidature`, `/relances` (propose des mails, n'envoie **jamais**
+  rien), `/bilan`. Si plusieurs candidatures correspondent : demander laquelle.
+
+## Dashboard (`dashboard/`)
+
+- Streamlit, lancé par `Lancer_Dashboard.bat` (ou
+  `python -m streamlit run dashboard/app.py`), sur http://localhost:8501.
+- L'onglet *Nouvelle candidature* lance `/adapter-cv` en headless
+  (`dashboard/claude_runner.py`) : `claude -p` avec `--allowedTools` limité
+  (lecture du projet, écriture dans `offres/` seulement, scripts du projet).
+  Les traitements sont dans `offres/_jobs/<horodatage>/`. Protocole de fin de
+  réponse : `DOSSIER_OFFRE:`, `QUESTION_DASHBOARD:`, `ERREUR_DASHBOARD:`.
+- Style : `dashboard/style.css` + composants `dashboard/ui.py`. Thème clair
+  uniquement (Streamlit 1.50 ne gère qu'un thème personnalisé).
+- Captures d'écran publiques (README) : uniquement avec le profil fictif,
+  `AGENT_CV_MASTER=data/master_cv.example.yaml`, jamais avec le vrai CV.
+- Tests : `python -m unittest discover -s tests`.
 
 ## Points de validation avec Mathieu
 

@@ -31,14 +31,21 @@ def fmt_date(s) -> str:
 
 
 def bandeau_demo(cands: list[dict]):
+    if os.environ.get("AGENT_CV_MASTER"):  # mode captures d'écran : pas de bandeau
+        return
     n = sum(1 for c in cands if c["est_demo"])
     if n:
         st.caption(f"🧪 {n} candidature(s) de démo affichée(s) : elles seront supprimées quand tu valides le dashboard.")
 
 
 def personal() -> dict:
-    for nom in ("master_cv.yaml", "master_cv.example.yaml"):
-        p = ROOT / "data" / nom
+    """Coordonnées du master CV. AGENT_CV_MASTER permet d'utiliser un autre fichier
+    (ex : le profil fictif pour des captures d'écran publiques)."""
+    candidats = [os.environ["AGENT_CV_MASTER"]] if os.environ.get("AGENT_CV_MASTER") else []
+    candidats += [ROOT / "data" / n for n in ("master_cv.yaml", "master_cv.example.yaml")]
+    for p in map(pathlib.Path, candidats):
+        if not p.is_absolute():
+            p = ROOT / p
         if p.exists():
             return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("personal", {}) or {}
     return {}
