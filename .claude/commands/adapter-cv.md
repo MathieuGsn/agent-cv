@@ -20,6 +20,16 @@ si une information manque vraiment pour continuer.
   le contenu de l'offre.
 - Si `$ARGUMENTS` est un chemin vers un PDF : extraire le texte (pdftotext via
   `scripts/_tools.find_tool`, ou lire le PDF directement).
+- Si `$ARGUMENTS` est un chemin vers un `.txt` / `.md` : lire ce fichier. Il
+  peut commencer par un en-tête entre deux lignes `---` (écrit par le
+  dashboard) avec `lien:`, `entreprise:`, `poste:`, `source:`. Les valeurs
+  renseignées priment sur la détection ; les vides sont à détecter depuis le
+  texte. L'en-tête ne fait pas partie de l'offre (ne pas le mettre dans
+  `offre.txt`).
+- Noter aussi, si le texte les donne : lien de l'offre, source (plateforme :
+  Welcome to the Jungle, LinkedIn, Indeed, JobTeaser, HelloWork, APEC, Site
+  entreprise, Candidature spontanée, Cooptation, Autre — déduite de l'URL ou
+  du texte, sinon laisser vide), ville, type de contrat, date de début.
 - Déterminer l'entreprise et l'intitulé du poste à partir du texte récupéré.
 - Créer le dossier `offres/<AAAA-MM-JJ>_<entreprise>_<poste>/` (date du jour,
   entreprise et poste slugifiés : minuscules, sans accents, espaces -> tirets).
@@ -93,13 +103,47 @@ pour tenir sur une page.
 ```
 python scripts/ats_check.py "offres/<dossier>/Mathieu_Gasnier_CV_<Entreprise>.pdf" --lang <fr|en>
 python scripts/keyword_score.py --keywords-file offres/<dossier>/keywords.txt \
-  --before output/cv_base.pdf --after "offres/<dossier>/Mathieu_Gasnier_CV_<Entreprise>.pdf"
+  --before output/cv_base.pdf --after "offres/<dossier>/Mathieu_Gasnier_CV_<Entreprise>.pdf" \
+  --json-out offres/<dossier>/score.json
 ```
 
 Si `ats_check.py` signale un problème, corriger `cv_adapte.yaml` ou le
 template et recompiler avant de livrer.
 
-## 7. Récap final (court)
+## 7. Enregistrer dans le suivi des candidatures
+
+Écrire `offres/<dossier>/resultat.json` (UTF-8). Ne mettre que des infos
+réellement présentes dans l'offre ; `null` sinon, ne rien deviner :
+
+```json
+{
+  "entreprise": "Acme",
+  "poste": "Stage Data Engineer",
+  "lien_offre": "https://... ou null",
+  "source": "Welcome to the Jungle ou null",
+  "ville": "Paris ou null",
+  "type_contrat": "Stage de fin d'études",
+  "date_debut_souhaitee": "AAAA-MM-JJ ou null",
+  "langue": "fr",
+  "chemin_cv_pdf": "offres/<dossier>/Mathieu_Gasnier_CV_<Entreprise>.pdf",
+  "modifications": ["Expérience X mise en avant", "Compétence Y remontée en tête", "..."],
+  "competences_manquantes": ["Compétence demandée absente du master", "..."],
+  "a_confirmer": ["Mot-clé que Mathieu a peut-être mais absent du master", "..."]
+}
+```
+
+Puis lancer :
+
+```
+python scripts/candidatures.py enregistrer offres/<dossier>
+```
+
+La candidature est ajoutée avec le statut `À postuler`, avec les scores lus
+dans `score.json`. Si elle existe déjà (même dossier, même lien ou même
+entreprise + poste), la ligne est mise à jour sans doublon et son statut
+n'est pas modifié.
+
+## 8. Récap final (court)
 
 Donner à Mathieu :
 - Score de correspondance mots-clés avant → après (sortie de
@@ -111,3 +155,6 @@ Donner à Mathieu :
 - Compétences demandées par l'offre qu'il n'a pas (listées, jamais ajoutées
   au CV).
 - Chemin du PDF final.
+- Ligne ajoutée / mise à jour dans le suivi (sortie de `candidatures.py
+  enregistrer`), et rappel : `/postule <entreprise>` une fois la candidature
+  envoyée.

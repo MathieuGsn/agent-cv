@@ -11,6 +11,7 @@ Usage CLI (sortie JSON quand --json est passé) :
     python scripts/candidatures.py list [--statut "Postulé"] [--json]
     python scripts/candidatures.py find <texte> [--json]
     python scripts/candidatures.py upsert --json-file chemin.json
+    python scripts/candidatures.py enregistrer offres/<dossier>   # fin de /adapter-cv
     python scripts/candidatures.py add --entreprise X --poste Y [--source ...] [...]
     python scripts/candidatures.py postule <id>
     python scripts/candidatures.py statut <id> "<statut>" [--note "..."]
@@ -370,6 +371,41 @@ def upsert(conn, **champs) -> tuple[int, bool]:
     return existant["id"], False
 
 
+def enregistrer_offre(conn, dossier: str | pathlib.Path) -> tuple[int, bool]:
+    """Fin de /adapter-cv : lit resultat.json (+ score.json) d'un dossier d'offre et fait l'upsert.
+
+    resultat.json (écrit par l'agent) : entreprise, poste, lien_offre, source,
+    ville, type_contrat, date_debut_souhaitee, chemin_cv_pdf, modifications,
+    competences_manquantes...
+    score.json (écrit par keyword_score.py --json-out) : score_avant, score_apres.
+    """
+    d = pathlib.Path(dossier)
+    if not d.is_absolute():
+        d = ROOT / d
+    resultat_path = d / "resultat.json"
+    if not resultat_path.exists():
+        raise FileNotFoundError(f"{resultat_path} introuvable.")
+    champs = json.loads(resultat_path.read_text(encoding="utf-8"))
+    score_path = d / "score.json"
+    if score_path.exists():
+        score = json.loads(score_path.read_text(encoding="utf-8"))
+        champs.setdefault("score_avant", score.get("score_avant"))
+        champs.setdefault("score_apres", score.get("score_apres"))
+    champs["chemin_dossier_offre"] = str(d)
+    if not champs.get("chemin_cv_pdf"):
+        pdfs = sorted(d.glob("*.pdf"))
+        if pdfs:
+            champs["chemin_cv_pdf"] = str(pdfs[0])
+    elif not pathlib.Path(champs["chemin_cv_pdf"]).is_absolute():
+        p = pathlib.Path(champs["chemin_cv_pdf"])
+        champs["chemin_cv_pdf"] = str(ROOT / p if (ROOT / p).exists() else d / p)
+    if champs.get("source") and champs["source"] not in SOURCES:
+        n = normaliser(champs["source"])
+        champs["source"] = next((s for s in SOURCES if normaliser(s) == n), champs["source"])
+    champs.pop("statut", None)  # une ré-adaptation ne change jamais le statut
+    return upsert(conn, **champs)
+
+
 def supprimer(conn, cid: int) -> None:
     conn.execute("DELETE FROM candidatures WHERE id=?", (cid,))
     conn.commit()
@@ -544,6 +580,7 @@ def main(argv=None):
     s = sub.add_parser("find"); s.add_argument("texte"); s.add_argument("--json", action="store_true")
     s = sub.add_parser("show"); s.add_argument("id", type=int)
     s = sub.add_parser("upsert"); s.add_argument("--json-file", required=True)
+    s = sub.add_parser("enregistrer"); s.add_argument("dossier")
     s = sub.add_parser("add")
     for champ in CHAMPS:
         if champ not in ("est_demo", "date_derniere_maj", "date_statut"):
@@ -586,6 +623,10 @@ def main(argv=None):
             champs = json.load(f)
         cid, cree = upsert(conn, **champs)
         print(f"{'Ajoutée' if cree else 'Mise à jour'} : {_fmt(get(conn, cid))}")
+    elif a.cmd == "enregistrer":
+        cid, cree = enregistrer_offre(conn, a.dossier)
+        c = get(conn, cid)
+        print(f"{'Ajoutée au suivi' if cree else 'Déjà suivie, mise à jour'} : {_fmt(c)}")
     elif a.cmd == "add":
         champs = {k: v for k, v in vars(a).items() if k in CHAMPS and v}
         cid = ajouter(conn, **champs)

@@ -10,6 +10,7 @@ Usage:
         --before output/cv_base.pdf --after offres/.../Mathieu_Gasnier_CV_Acme.pdf
 """
 import argparse
+import json
 import pathlib
 import re
 import subprocess
@@ -121,6 +122,7 @@ def main():
     parser.add_argument("--cv", help="CV unique à scorer (PDF ou texte)")
     parser.add_argument("--before", help="CV de référence (ex: cv_base.pdf) pour comparaison avant/après")
     parser.add_argument("--after", help="CV adapté pour comparaison avant/après")
+    parser.add_argument("--json-out", help="Écrit aussi les scores dans ce fichier JSON (lu par le suivi des candidatures)")
     args = parser.parse_args()
 
     keywords = load_keywords(args)
@@ -147,6 +149,18 @@ def main():
             print("Nouveaux mots-clés couverts :", ", ".join(newly_matched))
         if still_missing:
             print("Toujours absents (compétences manquantes à confirmer) :", ", ".join(still_missing))
+        if args.json_out:
+            out = resolve_path(args.json_out)
+            out.write_text(json.dumps({
+                "score_avant": before_result["percent"],
+                "score_apres": after_result["percent"],
+                "total_mots_cles": after_result["total"],
+                "couverts_avant": before_result["matched"],
+                "couverts_apres": after_result["matched"],
+                "nouveaux": newly_matched,
+                "toujours_absents": still_missing,
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"Scores écrits dans {out}")
         return
 
     raise SystemExit("Fournir --cv seul, ou --before et --after pour une comparaison.")
