@@ -1,0 +1,10 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+runOnSave = false
+
+[theme]
+primaryColor = "#2563eb"
+font = "sans serif"

@@ -17,6 +17,10 @@ _FALLBACK_GLOBS = {
         r"%LOCALAPPDATA%\Programs\MiKTeX\miktex\bin\x64\pdftotext.exe",
         r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\oschwartz10612.Poppler_*\poppler-*\Library\bin\pdftotext.exe",
     ],
+    "pdftoppm": [
+        r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\oschwartz10612.Poppler_*\poppler-*\Library\bin\pdftoppm.exe",
+        r"%LOCALAPPDATA%\Programs\MiKTeX\miktex\bin\x64\pdftoppm.exe",
+    ],
     "pandoc": [
         r"%LOCALAPPDATA%\Pandoc\pandoc.exe",
     ],
